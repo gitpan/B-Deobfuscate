@@ -3,4 +3,8 @@ Revision history for Perl extension B::Deobfuscate.
 0.01  Thu Mar 20 13:57:44 2003
 	- original version; created by h2xs 1.5 with options
 		-X -P -n B::Deobfuscate
-
+0.02  Mon Mar 24 02:29:33 2003
+        - Dictionary sort is now predictable
+        - Added config file support
+0.03  Mon Mar 24 7 am
+        - Fixed Build.PL

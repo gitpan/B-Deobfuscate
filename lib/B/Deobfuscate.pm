@@ -8,7 +8,7 @@ use B::Keywords ();
 
 # Some functions may require() YAML
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 sub load_keywords {
     my $self = shift;
