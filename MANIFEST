@@ -1,5 +1,9 @@
 Changes
-Build.PL
-lib/B/Deobfuscate.pm
+LICENSE
 MANIFEST
+Makefile.PL
 README
+lib/B
+lib/B/Deobfuscate.pm
+lib/B/Deobfuscate.pod
+t/00basic.t

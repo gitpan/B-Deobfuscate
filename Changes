@@ -1,10 +1,22 @@
 Revision history for Perl extension B::Deobfuscate.
 
 0.01  Thu Mar 20 13:57:44 2003
-	- original version; created by h2xs 1.5 with options
-		-X -P -n B::Deobfuscate
+  - original version; created by h2xs 1.5 with options
+    -X -P -n B::Deobfuscate
 0.02  Mon Mar 24 02:29:33 2003
-        - Dictionary sort is now predictable
-        - Added config file support
+  - Dictionary sort is now predictable
+  - Added config file support
 0.03  Mon Mar 24 7 am
-        - Fixed Build.PL
+  - Fixed Build.PL
+0.04  Tue Mar 24 9 am
+  - Fixed a bug in gv_should_be_renamed where number variables higher
+    than 9 wouldn't be recognized.
+  - Added sigil detection to rename_gv
+  - Added Makefile.PL wrapper for Build.PL
+  - Use only symbols that are four or more characters
+0.05
+0.06
+  - Added an overridable *B::Deobfuscate::DATA dictionary
+  - Added an internal dictionary
+  - Support 5.6.1, 5.8.0 and bleadperl circa July 5, 2003 (which is nearly
+    5.8.1)
