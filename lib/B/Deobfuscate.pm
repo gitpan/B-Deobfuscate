@@ -1,13 +1,15 @@
 package B::Deobfuscate;
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use base 'B::Deparse';
 use B ();
 use B::Keywords ();
+use Carp 'confess';
+use IO::Handle ();
 
 # Some functions may require() YAML
 
-our $VERSION = '0.06';
+our $VERSION = '0.08';
 
 sub load_keywords {
     my $self = shift;
@@ -24,19 +26,24 @@ sub load_unknown_dict {
     my $self = shift;
     my $p = $self->{+__PACKAGE__};
     my $dict_file = $p->{'unknown_dict_file'};
+
+    local $/;
     my $dict_data;
 
     # slurp the entire dictionary at once
     if ($dict_file) {
         local *DICT;
         open DICT, '<', $dict_file
-            or die "Cannot open dictionary $dict_file: $!";
-        read DICT, $dict_data, -s DICT;
-        close DICT or die "Cannot close $dict_file: $!";
+            or confess( "Cannot open dictionary $dict_file: $!" );
+        $dict_data = <DICT>;
+        close DICT or confess( "Cannot close $dict_file: $!" );
     } else {
         # Use the built-in symbol list
-        local $/;
-        $dict_data = readline *DATA;
+        $dict_data = <DATA>;
+    }
+
+    unless ($dict_data) {
+	confess( "The symbol dictionary was empty!" );
     }
 
     my $k = $self->load_keywords;
@@ -45,6 +52,10 @@ sub load_unknown_dict {
         [ sort { length $a <=> length $b or $a cmp $b }
           grep { length > 3 and ! /\W/ and ! exists $k->{$_} }
           split /\n/, $dict_data ];
+    
+    unless (@{$p->{'unknown_dict_data'}}) {
+	confess( "The symbol dictionary is empty!" );
+    }
 }
 
 
@@ -53,7 +64,12 @@ sub next_short_dict_symbol {
     my $p = $self->{+__PACKAGE__};
 
     my $sym = shift @{ $p->{'unknown_dict_data'} };
-    push @{ $p->{'used_symbols'} }, $sym.
+    push @{ $p->{'used_symbols'} }, $sym;
+    
+    unless ($sym) {
+	confess( "The symbol dictionary has run out and is now empty" );
+    }
+    
     return $sym;
 }
 
@@ -63,6 +79,11 @@ sub next_long_dict_symbol {
 
     my $sym = pop @{ $p->{'unknown_dict_data'} };
     push @{ $p->{'used_symbols'} }, $sym;
+
+    unless ($sym) {
+	confess( "The symbol dictionary has run out and is now empty" );
+    }
+
     return $sym;
 }
 
@@ -70,20 +91,22 @@ sub load_user_config {
     my $self = shift;
     my $p = $self->{+__PACKAGE__};
     my $config_file = $p->{'user_config'};
-    defined $config_file and length $config_file or return;
 
-    -f $config_file or die "Configuration file $config_file doesn't exist";
+    return unless $config_file;
+
+    unless (-f $config_file) {
+	confess( "Configuration file $config_file doesn't exist" );
+    }
 
     require YAML;
     my $config = (YAML::LoadFile( $config_file ))[0];
     $p->{'globals_to_ignore'} = $config->{'globals_to_ignore'};
     $p->{'pad_symbols'} = $config->{'lexicals'};
     $p->{'gv_symbols'} = $config->{'globals'};
-    defined $config->{'dictionary'} and
+    $config->{'dictionary'} and
         $p->{'unknown_dict_file'} = $config->{'dictionary'};
-    if (defined $config->{'global_regex'}) {
-        my $r = $config->{'global_regex'};
-        $p->{'global_regex'} = qr/$r/;
+    if ($config->{'global_regex'}) {
+        $p->{'global_regex'} = qr/${\ $config->{'global_regex'}}/;
     }
 
     # Symbols that are listed with an undef value actually
@@ -91,8 +114,9 @@ sub load_user_config {
     for my $symt_nym (qw/pad gv/) {
         my $symt = $p->{"${symt_nym}_symbols"};
         for my $symt_key (keys %$symt) {
-            not defined $symt->{$symt_key} and
-                $symt->{$symt_key} = $symt_key;
+	    if (not defined $symt->{$symt_key}) {
+		$symt->{$symt_key} = $symt_key;
+	    }
         }
     }
 }
@@ -103,6 +127,9 @@ sub gv_should_be_renamed {
     my $name = shift;
     my $p = $self->{+__PACKAGE__};
     my $k = $p->{'keywords'};
+
+    confess( "Undefined sigil" ) unless defined $sigil;
+    confess( "Undefined name" ) unless defined $name;
 
     # Ignore keywords
     return if
@@ -121,14 +148,19 @@ sub rename_pad {
     my $p = $self->{+__PACKAGE__};
     my $name = shift;
 
-    $name =~ m{\A(\W+)} or die "Invalid pad variable name $name";
+    $name =~ m{\A(\W+)} or confess( "Invalid pad variable name $name" );
     my $sigil = $1;
 
     my $dict = $p->{'pad_symbols'};
-    return $dict->{$name} if exists $dict->{$name};
+    return $dict->{$name} if $dict->{$name};
 
-    $dict->{$name} = $name;
-    return $dict->{$name} = $sigil . $self->next_short_dict_symbol;
+#    $dict->{$name} = $name;
+    $dict->{$name} = $sigil . $self->next_short_dict_symbol;
+    
+    unless ($dict->{$name}) {
+	confess( "The suggested name for the lexical variable $name is empty" );
+    }
+    return $dict->{$name};
 }
 
 sub rename_gv {
@@ -136,23 +168,53 @@ sub rename_gv {
     my $name = shift;
     my $p = $self->{+__PACKAGE__};
 
-    my $rv = (caller 5)[3];
-    my $sigil = $rv =~ /pp_rv2cv$/         ? '&'  :
-                $rv =~ /pp_gv$/            ? ''   :
-                $rv =~ /pp_rv2hv$/         ? '%'  :
-                $rv =~ /pp_rv2gv$/         ? '*'  :
-                ($rv =~ /pp_gvsv$/ or
-                 $rv =~ /pp_rv2sv$/)       ? '$' :
-                ($rv =~ /pp_av2arylen$/ or
-                 $rv =~ /pp_aelemfast$/ or
-                 $rv =~ /pp_rv2av$/)       ? '@' :
-                '';
+    my $sigil_debug;
+    my $sigil;
+    FIND_SIGIL: {
+	my $cx = 0;
+	{
+	    my $rv = (caller $cx)[3];
+	    $sigil = ( $rv =~ /pp_rv2cv$/         ? '&'  :
+		       $rv =~ /pp_gv$/            ? ''   :
+		       $rv =~ /next_todo$/        ? ''   :
+		       $rv =~ /pp_rv2hv$/         ? '%'  :
+		       $rv =~ /pp_rv2gv$/         ? '*'  :
+		       ($rv =~ /pp_gvsv$/ or
+			$rv =~ /pp_rv2sv$/)       ? '$' :
+		       ($rv =~ /pp_av2arylen$/ or
+			$rv =~ /pp_aelemfast$/ or
+			$rv =~ /pp_rv2av$/)       ? '@' :
+		       undef );
+	    $sigil_debug .= "$cx = $rv " .
+		(defined $sigil ? "'$sigil'\n" : "\n");
+	    
+	    last FIND_SIGIL if defined $sigil;
+
+	    $cx++;
+	    unless ( (caller $cx)[3] ) {
+		confess( "No sigil could be found. Please report the following text:\n$sigil_debug\n" );
+	    }
+	    redo;
+	}
+    }
+
+    unless (defined $sigil) {
+	confess( "No sigil could be found. Please report the following text:\n$sigil_debug\n" );
+    }
 
     return $name unless $self->gv_should_be_renamed( $sigil, $name );
 
     my $dict = $p->{'gv_symbols'};
-    return $dict->{"$sigil$name"} if exists $dict->{"$sigil$name"};
-    return $dict->{"$sigil$name"} = $self->next_long_dict_symbol;
+    
+    my $sname = "$sigil$name";
+    return $dict->{$sname} if exists $dict->{$sname};
+    $dict->{$sname} = $self->next_long_dict_symbol;
+    
+    unless ($dict->{$sname}) {
+	confess( "$sname could not be renamed." );
+    }
+    
+    return $dict->{$sname};
 }
 
 ## OVERRIDE METHODS FROM B::Deparse
@@ -168,6 +230,7 @@ sub new {
     $p->{'pad_symbols'} = {};
     $p->{'gv_symbols'} = {};
     $p->{'output_yaml'} = 0;
+    $p->{'output_fh'} = *STDOUT{IO};
 
     while (my $arg = shift @_) {
         if ($arg =~ m{\A-d([^,]+)}) {
@@ -214,7 +277,8 @@ sub compile {
             $source .= qq(BEGIN { \$/ = $fs; \$\\ = $bs; }\n);
         }
 	
-	if ($^V ge v5.8.0) {
+	# Remember - octal here
+	if ($^V ge "\5\10\0") {
 	    my @BEGINs = !( *B::begin_av{CODE} and
 			    B::begin_av->isa('B::AV') ) ? () :
 			    B::begin_av->ARRAY;
@@ -274,10 +338,10 @@ sub compile {
 
         if ($p->{'output_yaml'}) {
             require YAML;
-            print YAML::Dump(\%dump, $source);
+	    $p->{'output_fh'}->print( YAML::Dump(\%dump, $source) );
         }
         else {
-            print $source;
+	    $p->{'output_fh'}->print( $source );
         }
     }
 }

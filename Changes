@@ -20,3 +20,9 @@ Revision history for Perl extension B::Deobfuscate.
   - Added an internal dictionary
   - Support 5.6.1, 5.8.0 and bleadperl circa July 5, 2003 (which is nearly
     5.8.1)
+0.07
+  - Added some sanity checking so that writing extensions is easier
+0.08
+  - Removed a v-string
+
+
