@@ -1,7 +1,7 @@
 
 =head1 NAME
 
-B::Deobfuscate - Extension to L<B::Deparse> for use in de-obfuscating source code
+B::Deobfuscate - Extension to B::Deparse for use in de-obfuscating source code
 
 =head1 SYNOPSIS
 

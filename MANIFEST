@@ -7,4 +7,13 @@ README
 lib/B/Deobfuscate.pm
 lib/B/Deobfuscate.pod
 t/00basic.t
-
+t/01cmd.t
+t/array_t
+t/canon.pl
+t/code_t
+t/config.yml
+t/dict.txt
+t/glob_t
+t/hash_t
+t/scalar_t
+t/syntax.pl

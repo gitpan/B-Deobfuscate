@@ -9,7 +9,7 @@ use IO::Handle ();
 
 # Some functions may require() YAML
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 sub load_keywords {
     my $self = shift;
@@ -103,8 +103,9 @@ sub load_user_config {
     $p->{'globals_to_ignore'} = $config->{'globals_to_ignore'};
     $p->{'pad_symbols'} = $config->{'lexicals'};
     $p->{'gv_symbols'} = $config->{'globals'};
-    $config->{'dictionary'} and
+    if ( $config->{dictionary} ) {
         $p->{'unknown_dict_file'} = $config->{'dictionary'};
+    }
     if ($config->{'global_regex'}) {
         $p->{'global_regex'} = qr/${\ $config->{'global_regex'}}/;
     }
@@ -163,6 +164,28 @@ sub rename_pad {
     return $dict->{$name};
 }
 
+sub lookup_sigil {
+    my $rv = shift;
+    
+    return '$' if
+	$rv =~ /(?:gvsv|padsv|rv2sv)$/;
+    
+    return '@' if
+ 	$rv =~ /(?:gvav|padav|av2arylen|rv2av|aelemfast|aelem|aslice)$/;
+    
+    return '%' if
+	$rv =~ /(?:padhv|rv2hv|helem|hslice)$/;
+    
+    return '&' if 
+	$rv =~ /rv2cv$/;
+    
+    return '' if
+	$rv =~ /(?:gv|gelem|rv2gv)$/;
+    
+    # Nothing valid.
+    return;
+}
+
 sub rename_gv {
     my $self = shift;
     my $name = shift;
@@ -174,17 +197,7 @@ sub rename_gv {
 	my $cx = 0;
 	{
 	    my $rv = (caller $cx)[3];
-	    $sigil = ( $rv =~ /pp_rv2cv$/         ? '&'  :
-		       $rv =~ /pp_gv$/            ? ''   :
-		       $rv =~ /next_todo$/        ? ''   :
-		       $rv =~ /pp_rv2hv$/         ? '%'  :
-		       $rv =~ /pp_rv2gv$/         ? '*'  :
-		       ($rv =~ /pp_gvsv$/ or
-			$rv =~ /pp_rv2sv$/)       ? '$' :
-		       ($rv =~ /pp_av2arylen$/ or
-			$rv =~ /pp_aelemfast$/ or
-			$rv =~ /pp_rv2av$/)       ? '@' :
-		       undef );
+	    $sigil = lookup_sigil( $rv );
 	    $sigil_debug .= "$cx = $rv " .
 		(defined $sigil ? "'$sigil'\n" : "\n");
 	    

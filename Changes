@@ -27,4 +27,8 @@ Revision history for Perl extension B::Deobfuscate.
 0.09
   - Removed a stupid and unrelated test that always failed. I'll create proper
     tests once I learn how to use Test::Harness.
-
+0.10
+  - broquaint of perlmonks.org noticed that I forgot to handle
+    the helem opcode. This attempts to handle all the cases I
+    need to (after consulting opcode.pl of the perl source).
+  - Added some real tests.
