@@ -1,103 +1,167 @@
 package B::Deobfuscate;
+use strict;
+use warnings;
+use vars '$VERSION';
 use base 'B::Deparse';
-use B qw(main_cv main_start main_root);
+use B ();
+use B::Keywords ();
 
-$VERSION = '0.01';
+# Some functions may require() YAML
 
-sub load_keyword_data {
+$VERSION = '0.02';
+
+sub load_keywords {
     my $self = shift;
-    $self->{'keyword_data'} =
-        { map { $_ => undef } qw[NULL __FILE__ __LINE__ __PACKAGE__
-__DATA__ __END__ AUTOLOAD BEGIN CORE DESTROY END EQ GE GT INIT LE LT NE
-CHECK abs accept alarm and atan2 bind binmode bless caller chdir chmod chomp
-chop chown chr chroot close closedir cmp connect continue cos crypt dbmclose
-dbmopen defined delete die do dump each else elsif endgrent endhostent
-endnetent endprotoent endpwent endservent eof eq eval exec exists exit exp
-fcntl fileno flock for foreach fork format formline ge getc getgrent getgrgid
-getgrnam gethostbyaddr gethostbyname gethostent getlogin getnetbyaddr
-getnetbyname getnetent getpeername getpgrp getppid getpriority getprotobyname
-getprotobynumber getprotoent getpwent getpwnam getpwuid getservbyname
-getservbyport getservent getsockname getsockopt glob gmtime goto grep gt hex
-if index int ioctl join keys kill last lc lcfirst le length link listen local
-localtime lock log lstat lt m map mkdir msgctl msgget msgrcv msgsnd my ne next
-no not oct open opendir or ord our pack package pipe pop pos print printf
-prototype push q qq qr quotemeta qw qx rand read readdir readline readlink
-readpipe recv redo ref rename require reset return reverse rewinddir rindex
-rmdir s scalar seek seekdir select semctl semget semop send setgrent
-sethostent setnetent setpgrp setpriority setprotoent setpwent setservent
-setsockopt shift shmctl shmget shmread shmwrite shutdown sin sleep socket
-socketpair sort splice split sprintf sqrt srand stat study sub substr symlink
-syscall sysopen sysread sysseek system syswrite tell telldir tie tied time
-times tr truncate uc ucfirst umask undef unless unlink unpack unshift untie
-until use utime values vec wait waitpid wantarray warn while write x xor y]};
+    my $p = $self->{+__PACKAGE__};
+
+    return $p->{'keywords'} = {
+               map { $_, undef }
+                   @B::Keywords::Barewords,
+                   # Snip the sigils.
+                   map(substr($_,1), @B::Keywords::Symbols) };
 }
 
-sub load_dict_data {
+sub load_unknown_dict {
     my $self = shift;
-    open DICT, '<', $self->{'dict_file'} or die "Cannot open dictionary at $self->{'dict_file'}: $!";
-    read DICT, $self->{'dict_data'}, -s DICT;
-    close DICT or die "Cannot close dictionary: $!";
+    my $p = $self->{+__PACKAGE__};
+    my $dict_file = $p->{'unknown_dict_file'};
+    length $dict_file or return;
+    my $dict_data;
 
-    my $keys = $self->{'keyword_data'};
-    $self->{'dict_data'} = [ sort { length $a <=> length $b }
-                             grep { ! /\W/ and ! exists $keys->{$_} }
-                             split /\n/,
-                             $self->{'dict_data'} ];
+    # slurp the entire dictionary at once
+    open DICT, '<', $dict_file
+        or die "Cannot open dictionary $dict_file: $!";
+    read DICT, $dict_data, -s DICT;
+    close DICT or die "Cannot close $dict_file: $!";
+
+    my $k = $self->load_keywords;
+
+    $p->{'unknown_dict_data'} =
+        [ sort { length $a <=> length $b or $a cmp $b }
+          grep { ! /\W/ and ! exists $k->{$_} }
+          split /\n/, $dict_data ];
 }
 
-sub rename_symbol {
+
+sub next_short_dict_symbol {
+    my $self = shift;
+    my $p = $self->{+__PACKAGE__};
+
+    my $sym = shift @{ $p->{'unknown_dict_data'} };
+    push @{ $p->{'used_symbols'} }, $sym.
+    return $sym;
+}
+
+sub next_long_dict_symbol {
+    my $self = shift;
+    my $p = $self->{+__PACKAGE__};
+
+    my $sym = pop @{ $p->{'unknown_dict_data'} };
+    push @{ $p->{'used_symbols'} }, $sym;
+    return $sym;
+}
+
+sub load_user_config {
+    my $self = shift;
+    my $p = $self->{+__PACKAGE__};
+    my $config_file = $p->{'user_config'};
+    defined $config_file and length $config_file or return;
+
+    -f $config_file or die "Configuration file $config_file doesn't exist";
+
+    require YAML;
+    my $config = (YAML::LoadFile( $config_file ))[0];
+    $p->{'globals_to_ignore'} = $config->{'globals_to_ignore'};
+    $p->{'pad_symbols'} = $config->{'lexicals'};
+    $p->{'gv_symbols'} = $config->{'globals'};
+    defined $config->{'dictionary'} and
+        $p->{'unknown_dict_file'} = $config->{'dictionary'};
+    if (defined $config->{'global_regex'}) {
+        my $r = $config->{'global_regex'};
+        $p->{'global_regex'} = qr/$r/;
+    }
+
+    # Symbols that are listed with an undef value actually
+    # just aren't renamed at all.
+    for my $symt_nym (qw/pad gv/) {
+        my $symt = $p->{"${symt_nym}_symbols"};
+        for my $symt_key (keys %$symt) {
+            not defined $symt->{$symt_key} and
+                $symt->{$symt_key} = $symt_key;
+        }
+    }
+}
+
+sub gv_should_be_renamed {
     my $self = shift;
     my $name = shift;
-    $name =~ $self->{'rename'};
+    my $p = $self->{+__PACKAGE__};
+    my $k = $p->{'keywords'};
+
+    # Ignore keywords
+    return if exists $k->{$name} or
+              $name =~ m{\A[[:digit:]]\z};
+
+    if (exists $p->{'gv_symbols'}{$name} or
+        $name =~ $p->{'gv_match'} ) {
+        return 1;
+    }
+    return;
 }
 
-sub read_dict_symbol {
+sub rename_pad {
     my $self = shift;
-    $self->{'dict_data'} or $self->load_dict_data;
-
-    return pop @{ $self->{'dict_data'} };
-}
-
-sub pad_unstunnix {
-    my $self = shift;
+    my $p = $self->{+__PACKAGE__};
     my $name = shift;
-    my $dict = $self->{'pad_dict'};
 
-    $name =~ m{^(\W+)} or die "Invalid pad variable name $name";
+    $name =~ m{\A(\W+)} or die "Invalid pad variable name $name";
     my $sigil = $1;
 
-    return $name unless $self->rename_symbol( $name );
+    my $dict = $p->{'pad_symbols'};
     return $dict->{$name} if exists $dict->{$name};
-    return $dict->{$name} = $sigil . $self->read_dict_symbol;
+
+    $dict->{$name} = $name;
+    return $dict->{$name} = lc $sigil . $self->next_short_dict_symbol;
 }
 
-sub gv_unstunnix {
+sub rename_gv {
     my $self = shift;
     my $name = shift;
-    my $dict = $self->{'gv_dict'};
+    my $p = $self->{+__PACKAGE__};
 
-    return $name unless $self->rename_symbol( $name );
+    return $name unless $self->gv_should_be_renamed( $name );
+
+    my $dict = $p->{'gv_symbols'};
     return $dict->{$name} if exists $dict->{$name};
-    return $dict->{$name} = $self->read_dict_symbol;
+    return $dict->{$name} = ucfirst $self->next_long_dict_symbol;
 }
 
 sub new {
     my $class = shift;
     my $self = $class->SUPER::new( @_ );
-    $self->load_keyword_data;
-    $self->{'dict_file'} = '/usr/share/dict/stop';
-    $self->{'dict_data'} = undef;
-    $self->{'pad_dict'} = {};
-    $self->{'gv_dict'} = {};
-    $self->{'rename'} = qr/^\W{,2}z[\da-f]{8,}/;
+    my $p = $self->{+__PACKAGE__} = {};
+    $p->{'unknown_dict_file'} = '/usr/share/dict/stop';
+    $p->{'unknown_dict_data'} = undef;
+    $p->{'user_config'} = undef;
+    $p->{'gv_match'} = qw/\A[[:lower:][:digit:]_]+\z/;
+    $p->{'pad_symbols'} = {};
+    $p->{'gv_symbols'} = {};
+    $p->{'output_yaml'} = 0;
 
     while (my $arg = shift @_) {
-        if ($arg =~ /^-d([^,]+)/) {
-            $self->{'dict_file'} = $1;
-        } elsif ($arg =~ m{^-m/([^/]+)/} ) {
-            $self->{'rename'} = $1;
+        if ($arg =~ m{\A-d([^,]+)}) {
+            $p->{'unknown_dict_file'} = $1;
+        } elsif ($arg =~ m{\A-c([^,]+)} ) {
+            $p->{'user_config'} = $1;
+        } elsif ($arg =~ m{\A-m/([^/]+)/} ) {
+            $p->{'gv_match'} = $1;
+        } elsif ($arg =~ m{\A-y}) {
+            $p->{'output_yaml'} = 1;
         }
     }
+
+    $self->load_user_config;
+    $self->load_unknown_dict;
 
     return $self;
 }
@@ -105,20 +169,35 @@ sub new {
 sub compile {
     my(@args) = @_;
     return sub {
+        my $source = '';
         my $self = B::Deobfuscate->new(@args);
         $self->stash_subs("main");
-        $self->{'curcv'} = main_cv;
-        $self->walk_sub(main_cv, main_start);
-        print $self->print_protos;
+        $self->{'curcv'} = B::main_cv;
+        $self->walk_sub(B::main_cv, B::main_start);
+        $source .= join '', $self->print_protos;
         @{$self->{'subs_todo'}} =
           sort {$a->[0] <=> $b->[0]} @{$self->{'subs_todo'}};
-        print $self->indent($self->deparse(main_root, 0)), "\n"
-          unless B::Deparse::null main_root;
+        $source .= join '', $self->indent($self->deparse(B::main_root, 0)), "\n"
+          unless B::Deparse::null B::main_root ;
         my @text;
         while (scalar(@{$self->{'subs_todo'}})) {
             push @text, $self->next_todo;
         }
-        print $self->indent(join("", @text)), "\n" if @text;
+        $source .= join '', $self->indent(join("", @text)), "\n" if @text;
+
+        my $p = $self->{+__PACKAGE__};
+        my %dump = ( lexicals => $p->{'pad_symbols'},
+                     globals => $p->{'gv_symbols'},
+                     dictionary => $p->{'unknown_dict_file'},
+                     global_regex => $p->{'gv_match'} );
+
+        if ($p->{'output_yaml'}) {
+            require YAML;
+            print YAML::Dump(\%dump, $source);
+        }
+        else {
+            print $source;
+        }
     }
 }
 
@@ -126,27 +205,27 @@ sub padname {
     my $self = shift;
     my $padname = $self->SUPER::padname( @_ );
 
-    return $self->pad_unstunnix( $padname );
+    return $self->rename_pad( $padname );
 }
 
 sub gv_name {
     my $self = shift;
     my $gv_name = $self->SUPER::gv_name( @_ );
 
-    return $self->gv_unstunnix( $gv_name );
+    return $self->rename_gv( $gv_name );
 }
 
 1;
 
 __END__
 
-=head1 B::Deobfuscate
+=head1 NAME
 
 B::Deobfuscate - Extension to B::Deparse for use in de-obfuscating source code
 
 =head1 SYNOPSIS
 
-  perl -MO=Deobfuscate[,-d*DICTIONARY*][,-m*REGEX*] *prog.pl*
+  perl -MO=Deobfuscate,-csynthetic.yml,-y synthetic.pl
 
 =head1 DESCRIPTION
 
@@ -215,11 +294,103 @@ loaded into memory at once.
 =item B<-m>I<REGEX>
 
 Supply a different regular expression for deciding which symbols to rename.
-The default value is /^\W{,2}z[\da-f]{8,}/. Your expression must be delimited
-by the '/' characters and you may not use that character within the expression.
-That shouldn't be an issue because '/' isn't valid in a symbol name anyway.
+The default value is /\A[[:lower:][:digit:]_]+\z/. Your expression must be
+delimited by the '/' characters and you may not use that character within the
+expression. That shouldn't be an issue because '/' isn't valid in a symbol
+name anyway.
 
-  -a/^\W{,2}z[\da-f]{8,}/
+  -a/\A[[:lower:][:digit:]_]+\z/
+
+=item B<-y>
+
+print two B<YAML> documents to STDOUT instead of the deparsed source code.
+The first document is a configuration document suitable for use with the B<-c>
+parameter. The second document is the deparsed source code. Use this feature
+to generate a configuration document for further, iterative reverse engineering.
+
+=item B<-c>I<FILENAME>
+
+Supply a filename to a B<YAML> configuration file. Normally you would generate this
+file by saving the results of the B<-y> parameter to a file. You can then edit the
+file to provide your own names for symbols and not rely on the random symbol picker
+in B<B::Deobfuscate>. You may create your own B<YAML> configuration file as well.
+
+=back
+
+=head1 CONFIGURATION FILE
+
+The B::Deobfuscation symbol renamer can be controlled with by a configuration file.
+Use of this feature requires the L<YAML> module be installed.
+
+ dictionary: '/usr/share/dict/propernames'
+ global_regex: '(?:)'
+ globals:
+   kSDsfDS: Slartibartfast
+   HGFdsfds: Triantaphyllos
+ lexicals:
+   '$SdfSd': '$No'
+   '$GsdDd': '$Ed'
+   '$Ksdfs': '$Ji'
+
+The following keys are recognized:
+
+=over 4
+
+=item B<dictionary>
+
+This is a filename path to the operative dictionary.
+
+ dictionary: /usr/share/dict/stop
+
+=item B<global_regex>
+
+This regular expression tests global symbols. Only symbols that match this
+expression may be renamed. The default value is '\A[[:lower:][:digit:]_]\z/.
+In perl, global symbols are independent of their sigil so the values being
+tested are bare. Future versions of B::Deobfuscate may add the sigil to the
+symbol name.
+
+ global_regex: '\A[[:lower:][:digit:]_]\z'
+
+=item B<globals>
+
+This is a hash detailing symbol names as used in the original source and the
+name used in the deobfuscated source. For example - if the original source
+has a variable named @z12345 and you wish to rename all occurrances to 
+@URLList then the hash would associate 'z12345' with 'URLList'. The dictionary
+picker fills these values in automatically.
+
+If you wish to prevent B::Deobfuscate from renaming a symbol then specify the
+new value as '~' (which in YAML terms is undef).
+
+ globals:
+   catfile: ~
+   opt_n: ~
+   opt_t: ~
+   opt_u: ~
+   z1234567890: Postprocesser
+   z2345678901: Constructable
+   z3456789012: Photosynthesises
+   z4567890123: Undiscriminate
+   z5678901234: Parenthesises
+   z6789012345: Animadvertion
+
+=item B<lexicals>
+
+Lexicals is a hash exactly like `globals' except that all the symbol names
+include the sigil which doesn't currently happen for globals.
+
+ lexicals:
+   '$k1234567890': '$ivs'
+   '$k2345678901': '$ehs'
+   '$k3456789012': '$ans'
+   '$k4567890123': '$ons'
+   '$k5678901234': '$ofs'
+   '$k6789012345': '$gos'
+   '$k7890123456': '$dus'
+   '$k8901234567': '$iis'
+   '$k9012345678': '$ats'
+   '$k0123456780': '$ets'
 
 =back
 
