@@ -1,0 +1,6 @@
+Revision history for Perl extension B::Deobfuscate.
+
+0.01  Thu Mar 20 13:57:44 2003
+	- original version; created by h2xs 1.5 with options
+		-X -P -n B::Deobfuscate
+
