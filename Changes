@@ -24,5 +24,7 @@ Revision history for Perl extension B::Deobfuscate.
   - Added some sanity checking so that writing extensions is easier
 0.08
   - Removed a v-string
-
+0.09
+  - Removed a stupid and unrelated test that always failed. I'll create proper
+    tests once I learn how to use Test::Harness.
 

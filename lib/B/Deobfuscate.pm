@@ -9,7 +9,7 @@ use IO::Handle ();
 
 # Some functions may require() YAML
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 sub load_keywords {
     my $self = shift;
