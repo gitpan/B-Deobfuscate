@@ -13,15 +13,15 @@ my @scripts =
 my $syntax_checker = catfile( $test_dir, "syntax.pl" );
 
 for my $test (
-              [ q["$^X" "$syntax_checker" "$script"],
+              [ q["$syntax_checker" "$script"],
                 'basic syntax'],
-              [ q["$^X" "-Mblib" "-MO=Deobfuscate" "$script"],
+              [ q["-Mblib" "-MO=Deobfuscate" "$script"],
                 'basic deobfuscation'],
-              [ q["$^X" "-Mblib" "-MO=Deobfuscate,-y" "$script"],
+              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script"],
                 'yaml output'],
-              [ q["$^X" "-Mblib" "-MO=Deobfuscate,-y" "$script" | "$^X" "-000" "-MYAML" "-e" "Load(scalar <>)"],
+              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script" | "$^X" "-000" "-MYAML" "-e" "Load(scalar <>)"],
                 'yaml syntax'],
-              [ q["$^X" "-Mblib" "-MO=Deobfuscate" "$script" | "$^X" "$syntax_checker"],
+              [ q["-Mblib" "-MO=Deobfuscate" "$script" | "$^X" "$syntax_checker"],
                 'deobfuscation syntax check']
     ) {
     my $command   = $test->[0];
@@ -29,9 +29,10 @@ for my $test (
 
     for my $script (@scripts) {
 
-        eval qq{qx[$command]};
+	diag( eval qq{qq{"$^X" $command}} );
+        eval qq{qx["$^X" $command]};
         is( $@, '', "$test_name eval" );
-        is( $?, 0,  $test_name );
+        is( $? >> 8, 0,  $test_name );
     }
 }
 

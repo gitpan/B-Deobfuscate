@@ -32,3 +32,6 @@ Revision history for Perl extension B::Deobfuscate.
     the helem opcode. This attempts to handle all the cases I
     need to (after consulting opcode.pl of the perl source).
   - Added some real tests.
+0.11
+  - The dictionary may now have words that are shorter than 3 characters
+  - Fixed for 5.10

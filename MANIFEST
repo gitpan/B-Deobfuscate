@@ -4,6 +4,7 @@ MANIFEST
 META.yml
 Makefile.PL
 README
+SIGNATURE
 lib/B/Deobfuscate.pm
 lib/B/Deobfuscate.pod
 t/00basic.t
