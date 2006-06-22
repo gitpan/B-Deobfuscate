@@ -194,7 +194,7 @@ include the sigil which doesn't currently happen for globals.
 
 =head1 AUTHOR
 
-Joshua b. Jore <jjore@cpan.org>
+Joshua ben Jore <jjore@cpan.org>
 
 =head1 SEE ALSO
 

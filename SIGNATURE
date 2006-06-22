@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.54.
+signed via the Module::Signature module, version 0.53.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -14,14 +14,14 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 b186a102ce0f398e91f60867e38d62f66665a4ac Changes
-SHA1 0e987cce2b4e94a4d6920e7353f8674a4462528a LICENSE
+SHA1 813ab59104d20c2679d2b7042a98d67050245670 Changes
+SHA1 b1295d0d8f4e4c3b6118aac3f1cc5920268d0468 LICENSE
 SHA1 433091e7e0965ba66ab1e5245708d90d80fd1223 MANIFEST
 SHA1 6d95ef7d10e3c8f3d158b3c8da3e451e84c7ffcb META.yml
 SHA1 96fc21b7f5ce450186155556802d7821203e7fce Makefile.PL
 SHA1 5418ff58c7dc59edcc9afcf67e8f5f524ff77ee8 README
-SHA1 ba78a9747f0be32d311ab4de60dc13a28136a161 lib/B/Deobfuscate.pm
-SHA1 d180407427c6e6875bdf327af94cd1fd89ab7d4b lib/B/Deobfuscate.pod
+SHA1 24d3aad080e0fabfe7df589a138410224dc2b589 lib/B/Deobfuscate.pm
+SHA1 f02ea2092d8498cc775ccc4cefff5c10d0709838 lib/B/Deobfuscate.pod
 SHA1 346aafee906bf93794fe1e1fd68db4529fed941c t/00basic.t
 SHA1 b212275493ca70ee90fa268d6cedb7b48d1acc29 t/01cmd.t
 SHA1 05b8a6310ce93daa1441c33d9f54dc5327af81a5 t/array_t
@@ -36,7 +36,7 @@ SHA1 020791e5d62d369fbccfa931a5426e59f981ec63 t/syntax.pl
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.2.2 (GNU/Linux)
 
-iD8DBQFEmbtKejb/5debeXcRAmyaAJ0dxb2ZhdrdgwqF6fEAVOP55ODT+ACfTKTb
-Y5GES3Va7oL3/ZLU1h8vskE=
-=3WrH
+iD8DBQFEmjo9ejb/5debeXcRAgjAAKDE2Z5JGFjfiyB6xlArm+Sr7mRFlgCdGVTI
+E1ufpHzTM4Epo1TzXIzS+H4=
+=/F+R
 -----END PGP SIGNATURE-----

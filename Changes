@@ -35,3 +35,7 @@ Revision history for Perl extension B::Deobfuscate.
 0.11
   - The dictionary may now have words that are shorter than 3 characters
   - Fixed for 5.10
+0.12
+  - Updated the signature cuz the previous version forgot to account
+    for the change to META.yml
+  - *foo{CODE} -> defined( &foo ) per the docs.

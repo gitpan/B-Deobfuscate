@@ -2,29 +2,42 @@ package B::Deobfuscate;
 use strict;
 use warnings FATAL => 'all';
 use base 'B::Deparse';
-use B           ();
-use B::Keywords ();
+use B ();
+
+BEGIN {
+    for my $func (qw( begin_av init_av check_av end_av )) {
+        eval <<"FOO";
+            no strict 'refs';
+            B->import( '$func' );
+FOO
+
+        # If I couldn't create it, I'll just declare it to keep lint happy.
+        eval "sub $func;" if $@;
+    }
+}
+use B::Keywords qw( @Barewords @Symbols );
 use Carp 'confess';
 use IO::Handle ();
+use autouse YAML => 'LoadFile';
 
 # Some functions may require() YAML
 
-our $VERSION = '0.11';
+our $VERSION = '0.13';
 
 sub load_keywords {
-    my $self = shift;
+    my $self = shift @_;
     my $p    = $self->{ +__PACKAGE__ };
 
     return $p->{'keywords'} = {
-        map { $_, undef } @B::Keywords::Barewords,
+        map { $_, undef } @Barewords,
 
         # Snip the sigils.
-        map( substr( $_, 1 ), @B::Keywords::Symbols )
+        map( substr( $_, 1 ), @Symbols )
     };
 }
 
 sub load_unknown_dict {
-    my $self      = shift;
+    my $self      = shift @_;
     my $p         = $self->{ +__PACKAGE__ };
     my $dict_file = $p->{'unknown_dict_file'};
 
@@ -58,13 +71,13 @@ sub load_unknown_dict {
         $dict_data
     ];
 
-    unless ( @{ $p->{'unknown_dict_data'} } ) {
+    unless ( scalar @{ $p->{'unknown_dict_data'} } ) {
         confess("The symbol dictionary is empty!");
     }
 }
 
 sub next_short_dict_symbol {
-    my $self = shift;
+    my $self = shift @_;
     my $p    = $self->{ +__PACKAGE__ };
 
     my $sym = shift @{ $p->{'unknown_dict_data'} };
@@ -78,7 +91,7 @@ sub next_short_dict_symbol {
 }
 
 sub next_long_dict_symbol {
-    my $self = shift;
+    my $self = shift @_;
     my $p    = $self->{ +__PACKAGE__ };
 
     my $sym = pop @{ $p->{'unknown_dict_data'} };
@@ -92,7 +105,7 @@ sub next_long_dict_symbol {
 }
 
 sub load_user_config {
-    my $self        = shift;
+    my $self        = shift @_;
     my $p           = $self->{ +__PACKAGE__ };
     my $config_file = $p->{'user_config'};
 
@@ -102,8 +115,7 @@ sub load_user_config {
         confess("Configuration file $config_file doesn't exist");
     }
 
-    require YAML;
-    my $config = ( YAML::LoadFile($config_file) )[0];
+    my $config = ( LoadFile($config_file) )[0];
     $p->{'globals_to_ignore'} = $config->{'globals_to_ignore'};
     $p->{'pad_symbols'}       = $config->{'lexicals'};
     $p->{'gv_symbols'}        = $config->{'globals'};
@@ -127,9 +139,9 @@ sub load_user_config {
 }
 
 sub gv_should_be_renamed {
-    my $self  = shift;
-    my $sigil = shift;
-    my $name  = shift;
+    my $self  = shift @_;
+    my $sigil = shift @_;
+    my $name  = shift @_;
     my $p     = $self->{ +__PACKAGE__ };
     my $k     = $p->{'keywords'};
 
@@ -150,9 +162,9 @@ sub gv_should_be_renamed {
 }
 
 sub rename_pad {
-    my $self = shift;
+    my $self = shift @_;
     my $p    = $self->{ +__PACKAGE__ };
-    my $name = shift;
+    my $name = shift @_;
 
     $name =~ m{\A(\W+)} or confess("Invalid pad variable name $name");
     my $sigil = $1;
@@ -170,7 +182,7 @@ sub rename_pad {
 }
 
 sub lookup_sigil {
-    my $rv = shift;
+    my $rv = shift @_;
 
     return '$'
         if $rv =~ /(?:gvsv|padsv|rv2sv)$/;
@@ -192,8 +204,8 @@ sub lookup_sigil {
 }
 
 sub rename_gv {
-    my $self = shift;
-    my $name = shift;
+    my $self = shift @_;
+    my $name = shift @_;
     my $p    = $self->{ +__PACKAGE__ };
 
     my $sigil_debug;
@@ -242,7 +254,7 @@ FIND_SIGIL: {
 ## OVERRIDE METHODS FROM B::Deparse
 
 sub new {
-    my $class = shift;
+    my $class = shift @_;
     my $self  = $class->SUPER::new(@_);
     my $p     = $self->{ +__PACKAGE__ } = {};
     $p->{'unknown_dict_file'} = undef;
@@ -278,11 +290,11 @@ sub new {
 BEGIN {
 
     # B::perlstring was added in 5.8.0
-    if ( *B::perlstring{CODE} ) {
-        *perlstring = *B::perlstring{CODE};
+    if ( defined &B::perlstring ) {
+        *perlstring = \&B::perlstring;
     }
     else {
-        *perlstring = sub { '"' . quotemeta( shift() ) . '"' };
+        *perlstring = sub { '"' . quotemeta( shift @_ ) . '"' };
     }
 }
 
@@ -307,15 +319,25 @@ sub compile {
 
         # Remember - octal here
         if ( $] >= 5.008 ) {
-            my @BEGINs =
-                !( *B::begin_av{CODE} and B::begin_av->isa('B::AV') )
-                ? ()
-                : B::begin_av->ARRAY;
-            my @INITs = B::init_av->isa('B::AV') ? B::init_av->ARRAY: ();
-            my @ENDs =
-                !( *B::end_av{CODE} and B::end_av->isa('B::AV') )
-                ? ()
-                : B::end_av->ARRAY;
+            my @BEGINs;
+            if ( defined &begin_av
+                and begin_av->isa('B::AV') )
+            {
+                @BEGINs = begin_av->ARRAY;
+            }
+
+            my @INITs;
+            if ( init_av->isa('B::AV') ) {
+                @INITs = init_av->ARRAY;
+            }
+
+            my @ENDs;
+            if ( defined &end_av
+                and end_av->isa('B::AV') )
+            {
+                @ENDs = end_av->ARRAY;
+            }
+
             for my $block ( @BEGINs, @INITs, @ENDs ) {
                 $self->todo( $block, 0 );
             }
@@ -385,14 +407,14 @@ sub compile {
 }
 
 sub padname {
-    my $self    = shift;
+    my $self    = shift @_;
     my $padname = $self->SUPER::padname(@_);
 
     return $self->rename_pad($padname);
 }
 
 sub gv_name {
-    my $self    = shift;
+    my $self    = shift @_;
     my $gv_name = $self->SUPER::gv_name(@_);
 
     return $self->rename_gv($gv_name);
