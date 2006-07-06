@@ -39,3 +39,12 @@ Revision history for Perl extension B::Deobfuscate.
   - Updated the signature cuz the previous version forgot to account
     for the change to META.yml
   - *foo{CODE} -> defined( &foo ) per the docs.
+0.13
+  - uh... broke stuff? The SIGNATURE is bad for META.yml anyway.
+  - I forget what else changed
+0.14
+  - Shuffled the PGP dictionary around and introduced a floral one
+  - Fussing
+  - autouse more of YAML
+  - autouse Carp
+  - Preliminary work for renaming classes & methods

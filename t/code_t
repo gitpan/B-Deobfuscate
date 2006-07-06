@@ -3,4 +3,4 @@ gen { 'bar' };
 *ken = \ & gen;
 ken();
 sub { shift } ->();
-BEGIN { close STDERR }
+

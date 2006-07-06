@@ -2,4 +2,4 @@ my %padhv;
 \%rv2hv;
 $helem{'foo'};
 @hslice{'foo', 'bar'};
-BEGIN { close STDERR }
+

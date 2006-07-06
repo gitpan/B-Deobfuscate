@@ -1,10 +1,10 @@
 --- #YAML:1.0
 name:                B-Deobfuscate
-version:             0.13
+version:             0.14
 abstract:            Extension to B::Deparse for use in de-obfuscating source code
 license:             unknown
 generated_by:        ExtUtils::MakeMaker version 6.30_02
-author:              Joshua b. Jore <jjore@cpan.org>
+author:              Joshua ben Jore <jjore@cpan.org>
 distribution_type:   module
 requires:     
     B::Keywords:                   0.03

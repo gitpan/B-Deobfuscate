@@ -1,4 +1,4 @@
 *_glob;
 *_gelem{'ARRAY'};
 \*_rv2gv;
-BEGIN { close STDERR }
+

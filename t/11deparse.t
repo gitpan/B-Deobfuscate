@@ -30,9 +30,13 @@ for my $test (
     for my $script (@scripts) {
 
 	diag( eval qq{qq{"$^X" $command}} );
-        eval qq{qx["$^X" $command]};
-        is( $@, '', "$test_name eval" );
-        is( $? >> 8, 0,  $test_name );
+	local ( $@, $? );
+        my $out = eval qq{qx["$^X" $command]};
+	my ( $e, $rc ) = ( $@, $? >> 8 );
+        is( $e, '', "$test_name eval" );
+        is( $rc, 0, "$test_name exit code" );
+
+        if ( $rc != 0 ) { print $out }
     }
 }
 

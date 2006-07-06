@@ -1,4 +1,4 @@
 $gvsv;
 my $padsv;
 $$gvsv;
-BEGIN { close STDERR }
+# BEGIN { close STDERR }
