@@ -8,7 +8,7 @@ WriteMakefile(
         # B::Deparse
         # Carp
         # Data::Postponed
-        'B::Keywords' => '0.03',
+        'B::Keywords' => '1.04',
         'YAML'        => '0'
     },
     'ABSTRACT_FROM' => 'lib/B/Deobfuscate.pod',

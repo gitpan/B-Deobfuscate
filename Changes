@@ -48,3 +48,9 @@ Revision history for Perl extension B::Deobfuscate.
   - autouse more of YAML
   - autouse Carp
   - Preliminary work for renaming classes & methods
+0.15
+  - Removed SIGNATURE
+  - Fixed \ in $^X in t/11deparse.t
+  - Perl::Critic fussing.
+  - Disable broken debugging code.
+  - Require latest B::Keywords. Exports were changed.

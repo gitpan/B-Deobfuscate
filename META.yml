@@ -1,14 +1,12 @@
---- #YAML:1.0
-name:                B-Deobfuscate
-version:             0.14
-abstract:            Extension to B::Deparse for use in de-obfuscating source code
-license:             unknown
-generated_by:        ExtUtils::MakeMaker version 6.30_02
-author:              Joshua ben Jore <jjore@cpan.org>
-distribution_type:   module
-requires:     
-    B::Keywords:                   0.03
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         B-Deobfuscate
+version:      0.15
+version_from: lib/B/Deobfuscate.pm
+installdirs:  site
+requires:
+    B::Keywords:                   1.04
     YAML:                          0
-meta-spec:
-    url: <http://module-build.sourceforge.net/META-spec-new.html>;
-    version: 1.1
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.30

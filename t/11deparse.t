@@ -1,8 +1,8 @@
 use strict;
 use warnings;
 use Test::More tests => 65;
-use File::Basename;
-use File::Spec::Functions;
+use File::Basename 'dirname';
+use File::Spec::Functions qw( catfile catfile );
 
 my $test_dir = dirname( $0 );
 
@@ -12,6 +12,8 @@ my @scripts =
 
 my $syntax_checker = catfile( $test_dir, "syntax.pl" );
 
+( my $perlbin = $^X ) =~ s/\\/\\\\/g;
+
 for my $test (
               [ q["$syntax_checker" "$script"],
                 'basic syntax'],
@@ -19,9 +21,9 @@ for my $test (
                 'basic deobfuscation'],
               [ q["-Mblib" "-MO=Deobfuscate,-y" "$script"],
                 'yaml output'],
-              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script" | "$^X" "-000" "-MYAML" "-e" "Load(scalar <>)"],
+              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script" | "$perlbin" "-000" "-MYAML" "-e" "Load(scalar <>)"],
                 'yaml syntax'],
-              [ q["-Mblib" "-MO=Deobfuscate" "$script" | "$^X" "$syntax_checker"],
+              [ q["-Mblib" "-MO=Deobfuscate" "$script" | "$perlbin" "$syntax_checker"],
                 'deobfuscation syntax check']
     ) {
     my $command   = $test->[0];
@@ -29,9 +31,9 @@ for my $test (
 
     for my $script (@scripts) {
 
-	diag( eval qq{qq{"$^X" $command}} );
+	diag( eval qq{qq{"$perlbin" $command}} );
 	local ( $@, $? );
-        my $out = eval qq{qx["$^X" $command]};
+        my $out = eval qq{qx["$perlbin" $command]};
 	my ( $e, $rc ) = ( $@, $? >> 8 );
         is( $e, '', "$test_name eval" );
         is( $rc, 0, "$test_name exit code" );
@@ -42,11 +44,11 @@ for my $test (
 
 my $canonizer = catfile( $test_dir, "canon.pl" );
 for my $script (@scripts) {
-    my $normal = qq["$^X" "-MO=Concise" "$script" | ] .
-                 qq["$^X" "$canonizer"];
-    my $deob   = qq["$^X" "-Mblib" "-MO=Deobfuscate" "$script" | ] .
-                 qq["$^X" "-MO=Concise" | ] .
-                 qq["$^X" "$canonizer"];
+    my $normal = qq["$perlbin" "-MO=Concise" "$script" | ] .
+                 qq["$perlbin" "$canonizer"];
+    my $deob   = qq["$perlbin" "-Mblib" "-MO=Deobfuscate" "$script" | ] .
+                 qq["$perlbin" "-MO=Concise" | ] .
+                 qq["$perlbin" "$canonizer"];
 
     $normal = `$normal`;
     is( $?, 0, "Fetching normal optree: $script" );

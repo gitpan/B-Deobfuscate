@@ -31,9 +31,9 @@ use IO::Handle ();
 use autouse YAML => qw( LoadFile Dump );
 
 # use Data::Postponed 'postpone_forever';
-sub postpone_forever { shift @_ }
+sub postpone_forever { return shift @_ }
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 sub load_keywords {
     my $self = shift @_;
@@ -43,7 +43,7 @@ sub load_keywords {
         map { $_, undef } @Barewords,
 
         # Snip the sigils.
-        map( substr( $_, 1 ), @Symbols )
+        map { substr $_, 1 } @Symbols
     };
 }
 
@@ -52,7 +52,7 @@ sub load_unknown_dict {
     my $p         = $self->{ +__PACKAGE__ };
     my $dict_file = $p->{unknown_dict_file};
 
-    local $/;
+    local $/;    ## no critic
     my $dict_data;
 
     # slurp the entire dictionary at once
@@ -64,8 +64,9 @@ sub load_unknown_dict {
     else {
 
         # Use the built-in symbol list
+        no warnings 'once';    ## no critic Warnings
         require B::Deobfuscate::Dict::PGPHashWords;
-        $dict_data = $B::Deobfuscate::Dict::PGPHashWords;
+        $dict_data = $B::Deobfuscate::Dict::PGPHashWords;    ## no critic
     }
 
     unless ($dict_data) {
@@ -399,7 +400,9 @@ sub compile {
         else {
             $p->{output_fh}->print($source);
         }
-        }
+
+        return;
+    };
 }
 
 sub padname {
@@ -416,17 +419,17 @@ sub gv_name {
     return $self->rename_gv($gv_name);
 }
 
-BEGIN {
-    ## no critic
-    no strict 'refs';
-    for my $sub ( grep defined &$_, keys %B::Deobfuscate ) {
-        my $orig = \&$sub;
-        *$sub = sub {
-            print "$sub\n";
-            &$orig;
-        };
-    }
-}
+# BEGIN {
+#     ## no critic
+#     no strict 'refs';
+#     for my $sub ( grep defined &$_, keys %B::Deobfuscate:: ) {
+#         my $orig = \&$sub;
+#         *$sub = sub {
+#             print "$sub\n";
+#             &$orig;
+#         };
+#     }
+# }
 
 1;
 
