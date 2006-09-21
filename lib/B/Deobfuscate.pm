@@ -33,7 +33,7 @@ use autouse YAML => qw( LoadFile Dump );
 # use Data::Postponed 'postpone_forever';
 sub postpone_forever { return shift @_ }
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 sub load_keywords {
     my $self = shift @_;
@@ -48,25 +48,31 @@ sub load_keywords {
 }
 
 sub load_unknown_dict {
-    my $self      = shift @_;
-    my $p         = $self->{ +__PACKAGE__ };
-    my $dict_file = $p->{unknown_dict_file};
+    my $self = shift @_;
+    my $p    = $self->{ +__PACKAGE__ };
 
-    local $/;    ## no critic
     my $dict_data;
 
     # slurp the entire dictionary at once
-    if ($dict_file) {
+    if ( defined( my $dict_file = $p->{unknown_dict_file} ) ) {
         open my $fh, '<', $dict_file
             or confess "Cannot open dictionary $dict_file: $!";
+        local $/;    ## no critic
         $dict_data = [<$fh>];
     }
     else {
+    LOAD_DICTIONARY_MODULE:
+        for my $module ( $p->{unknown_dict_module}, 'PGPHashKeywords',
+            'Flowers' )
+        {
+            next if not defined $module;
+            eval "require B::Deobfuscate::Dict::$module";
+            next if $@;
 
-        # Use the built-in symbol list
-        no warnings 'once';    ## no critic Warnings
-        require B::Deobfuscate::Dict::PGPHashWords;
-        $dict_data = $B::Deobfuscate::Dict::PGPHashWords;    ## no critic
+            no strict 'refs';
+            $dict_data = ${"B::Deobfuscate::Dict::$module"};
+            last LOAD_DICTIONARY_MODULE;
+        }
     }
 
     unless ($dict_data) {
@@ -261,18 +267,22 @@ sub new {
     my $class = shift @_;
     my $self  = $class->SUPER::new(@_);
     my $p     = $self->{ +__PACKAGE__ } = {};
-    $p->{unknown_dict_file} = undef;
-    $p->{unknown_dict_data} = undef;
-    $p->{user_config}       = undef;
-    $p->{gv_match}          = qw/\A[[:lower:][:digit:]_]+\z/;
-    $p->{pad_symbols}       = {};
-    $p->{gv_symbols}        = {};
-    $p->{output_yaml}       = 0;
-    $p->{output_fh}         = *STDOUT{IO};
+    $p->{unknown_dict_file}   = undef;
+    $p->{unknown_dict_module} = undef;
+    $p->{unknown_dict_data}   = undef;
+    $p->{user_config}         = undef;
+    $p->{gv_match}            = qw/\A[[:lower:][:digit:]_]+\z/;
+    $p->{pad_symbols}         = {};
+    $p->{gv_symbols}          = {};
+    $p->{output_yaml}         = 0;
+    $p->{output_fh}           = \ *STDOUT;
 
     while ( my $arg = shift @_ ) {
         if ( $arg =~ m{\A-d([^,]+)} ) {
             $p->{unknown_dict_file} = $1;
+        }
+        elsif ( $arg =~ m{\A-D([^,]+)} ) {
+            $p->{unknown_dict_module} = $1;
         }
         elsif ( $arg =~ m{\A-c([^,]+)} ) {
             $p->{user_config} = $1;

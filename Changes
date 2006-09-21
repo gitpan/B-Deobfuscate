@@ -54,3 +54,6 @@ Revision history for Perl extension B::Deobfuscate.
   - Perl::Critic fussing.
   - Disable broken debugging code.
   - Require latest B::Keywords. Exports were changed.
+0.16
+  - Enabled alternate dictionary modules
+  - Added -D parameter to ->new

@@ -70,7 +70,7 @@ page to see what options are provided and how to use them.
 
 =over 4
 
-=item B<-d>I<DICTIONARY>
+=item B<-d>I<DICTIONARY FILE>
 
 Normally B::Deobfuscate reads an internal dictionary of easily pronounced
 keywords. If you would like to specify a different dictionary follow the -d
@@ -80,10 +80,15 @@ The entire dictionary will be loaded into memory at once.
 
   -d/usr/share/dict/stop
 
-For an alternate approach, see L<Acme::Floral>'s source code and how it
-installs an alternate dictionary of flower names. This writes a new dictionary
-to the *B::Deobfuscate::DATA filehandle before the B::Deobfuscate object
-decompiles the input perl code.
+=item B<-D>I<B::Deobfuscate::Dict:: module>
+
+B::Deobfuscate defaults to using the dictionary at
+B::Deobfuscate::Dict::PGPHashWords. You can ask it to load any other
+module under the B::Deobfuscate::Dict:: namespace by using the
+C<-D...> parameter.
+
+B::Deobfuscate 0.14 and above is distributed with the additional
+dictionary B::Deobfuscate::Dict::Flowers.
 
 =item B<-m>I<REGEX>
 
