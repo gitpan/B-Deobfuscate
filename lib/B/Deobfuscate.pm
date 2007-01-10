@@ -33,7 +33,7 @@ use autouse YAML => qw( LoadFile Dump );
 # use Data::Postponed 'postpone_forever';
 sub postpone_forever { return shift @_ }
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 sub load_keywords {
     my $self = shift @_;
@@ -66,10 +66,10 @@ sub load_unknown_dict {
             'Flowers' )
         {
             next if not defined $module;
-            eval "require B::Deobfuscate::Dict::$module";
+            eval "require B::Deobfuscate::Dict::$module";    ## no critic
             next if $@;
 
-            no strict 'refs';
+            no strict 'refs';                                ## no critic
             $dict_data = ${"B::Deobfuscate::Dict::$module"};
             last LOAD_DICTIONARY_MODULE;
         }
@@ -83,8 +83,8 @@ sub load_unknown_dict {
 
     $p->{unknown_dict_data} = [
         sort { length $a <=> length $b or $a cmp $b }
-            grep { not( /\W/ or exists $k->{$_} ) }
-            split /\n/,
+            grep { not( /\W/mx or exists $k->{$_} ) }
+            split /\n/mx,
         $dict_data
     ];
 
@@ -170,7 +170,7 @@ sub gv_should_be_renamed {
     # Ignore keywords
     return
         if exists $k->{$name}
-        or "$sigil$name" =~ m{\A\$\d+\z};
+        or "$sigil$name" =~ m{\A\$\d+\z}mx;
 
     if ( exists $p->{gv_symbols}{$name}
         or $name =~ $p->{gv_match} )
@@ -184,7 +184,7 @@ sub rename_pad {
     my ( $self, $name ) = @_;
     my $p = $self->{ +__PACKAGE__ };
 
-    my ($sigil) = $name =~ m{\A(\W+)}
+    my ($sigil) = $name =~ m{\A(\W+)}mx
         or confess "Invalid pad variable name $name";
 
     my $dict = $p->{pad_symbols};
@@ -202,23 +202,16 @@ sub rename_pad {
 sub lookup_sigil {
     my $rv = shift @_;
 
-    return '$'
-        if $rv =~ /(?:gvsv|padsv|rv2sv)\z/;
+    return $rv =~ /(?:gv|pad|rv2)sv\z/mx ? '$'
+        : $rv =~ /(?:gvav|padav|av2arylen|rv2av|aelemfast|aelem|aslice)\z/mx
+        ? '@'
+        : $rv =~ /(?:padhv|rv2hv|helem|hslice)\z/mx ? '%'
+        : $rv =~ /rv2cv\z/mx                        ? '&'
+        : $rv =~ /(?:gv|gelem|rv2gv)\z/mx           ? ''
+        :
 
-    return '@'
-        if $rv =~ /(?:gvav|padav|av2arylen|rv2av|aelemfast|aelem|aslice)\z/;
-
-    return '%'
-        if $rv =~ /(?:padhv|rv2hv|helem|hslice)\z/;
-
-    return '&'
-        if $rv =~ /rv2cv\z/;
-
-    return ''
-        if $rv =~ /(?:gv|gelem|rv2gv)\z/;
-
-    # Nothing valid.
-    return;
+        # Nothing valid;
+        ();
 }
 
 sub rename_gv {
@@ -275,9 +268,10 @@ sub new {
     $p->{pad_symbols}         = {};
     $p->{gv_symbols}          = {};
     $p->{output_yaml}         = 0;
-    $p->{output_fh}           = \ *STDOUT;
+    $p->{output_fh}           = \*STDOUT;
 
     while ( my $arg = shift @_ ) {
+        ## no critic
         if ( $arg =~ m{\A-d([^,]+)} ) {
             $p->{unknown_dict_file} = $1;
         }
@@ -301,7 +295,7 @@ sub new {
     return $self;
 }
 
-sub compile {
+sub compile {    ## no critic Complex
     my (@args) = @_;
 
     return sub {
@@ -315,6 +309,7 @@ sub compile {
         if ($^W) {              # deparse -w
             $source .= qq(BEGIN { \$^W = $^W; }\n);
         }
+        ## no critic PackageVar
         if ( $/ ne "\n" or defined $O::savebackslash ) {    # deparse -l -0
             my $fs = perlstring($/) || 'undef';
             my $bs = perlstring($O::savebackslash) || 'undef';
