@@ -65,3 +65,6 @@
 0.17:
   - Removed some dups from Flowers.pm
   - Made this Changes file into YAML for kicks.
+0.18:
+  - Fixed t/canon.t to be 5.6.x compatible.
+  - Quieter B imports.

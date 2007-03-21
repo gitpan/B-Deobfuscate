@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                B-Deobfuscate
-version:             0.17
+version:             0.18
 abstract:            Deobfuscate source code
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.31

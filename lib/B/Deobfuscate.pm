@@ -8,10 +8,15 @@ BEGIN {
     for my $func (qw( begin_av init_av check_av end_av )) {
 
         ## no critic
-        eval "B->import( '$func' );";
+        no strict 'refs';
+        if ( defined &{"B::$func"} ) {
+            B->import($func);
+        }
+        else {
 
-        # If I couldn't create it, I'll just declare it to keep lint happy.
-        eval "sub $func;" if $@;
+           # If I couldn't create it, I'll just declare it to keep lint happy.
+            eval "sub $func;";
+        }
     }
 
     # B::perlstring was added in 5.8.0
@@ -33,7 +38,7 @@ use autouse YAML => qw( LoadFile Dump );
 # use Data::Postponed 'postpone_forever';
 sub postpone_forever { return shift @_ }
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 sub load_keywords {
     my $self = shift @_;
