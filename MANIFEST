@@ -9,10 +9,6 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
 README
-t/01pod.t
-t/02pod-coverage.t
-t/03yaml.t
-t/04critic.t
 t/10load.t
 t/11deparse.t
 t/array_t

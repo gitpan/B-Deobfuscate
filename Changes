@@ -68,3 +68,7 @@
 0.18:
   - Fixed t/canon.t to be 5.6.x compatible.
   - Quieter B imports.
+0.19:
+  - Use IPC::Run for tests to hopefully be more cross-platform compatible.
+0.20
+  - fiddling w/ pause.cpan.org

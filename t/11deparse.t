@@ -1,60 +1,116 @@
 use strict;
 use warnings;
-use Test::More tests => 65;
-use File::Basename 'dirname';
-use File::Spec::Functions qw( catfile catfile );
+use Test::More;
 
-my $test_dir = dirname( $0 );
+BEGIN {
+    my @missing;
+    for (
+        [qw[ File::Basename dirname ]],
+        [qw[ File::Spec::Functions catfile catfile devnull ]],
+        [qw[ IPC::Run run ]],
+        [qw[ YAML Dump ]],
+        [qw[ File::Temp tempfile ]]
+        )
+    {
+        my ( $mod, @import ) = @$_;
+        eval "use $mod qw( @import )";
+        push @missing, $mod if $@;
+    }
 
-my @scripts =
-    map catfile( $test_dir, "${_}_t"),
-    qw(scalar array hash code glob);
-
-my $syntax_checker = catfile( $test_dir, "syntax.pl" );
-
-( my $perlbin = $^X ) =~ s/\\/\\\\/g;
-
-for my $test (
-              [ q["$syntax_checker" "$script"],
-                'basic syntax'],
-              [ q["-Mblib" "-MO=Deobfuscate" "$script"],
-                'basic deobfuscation'],
-              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script"],
-                'yaml output'],
-              [ q["-Mblib" "-MO=Deobfuscate,-y" "$script" | "$perlbin" "-000" "-MYAML" "-e" "Load(scalar <>)"],
-                'yaml syntax'],
-              [ q["-Mblib" "-MO=Deobfuscate" "$script" | "$perlbin" "$syntax_checker"],
-                'deobfuscation syntax check']
-    ) {
-    my $command   = $test->[0];
-    my $test_name = $test->[1];
-
-    for my $script (@scripts) {
-
-	diag( eval qq{qq{"$perlbin" $command}} );
-	local ( $@, $? );
-        my $out = eval qq{qx["$perlbin" $command]};
-	my ( $e, $rc ) = ( $@, $? >> 8 );
-        is( $e, '', "$test_name eval" );
-        is( $rc, 0, "$test_name exit code" );
-
-        if ( $rc != 0 ) { print $out }
+    if (@missing) {
+        plan( skip_all => "Missing modules @missing" );
+        exit 0;
+    }
+    else {
+        plan( tests => 5 * 5 + 3 * 5 );
     }
 }
 
-my $canonizer = catfile( $test_dir, "canon.pl" );
+my $test_dir = dirname($0);
+
+my @scripts = map catfile( $test_dir, "${_}_t" ),
+    qw(scalar array hash code glob);
+
+my $syntax_checker = catfile( $test_dir, 'syntax.pl' );
+
+my ( $tmp_fh, $tmp_nm ) = tempfile( UNLINK => 1 );
+for my $test (
+    {   cmd => [ [ $^X, $syntax_checker, 'HERE' ] ],
+        nm => 'basic syntax'
+    },
+    {   cmd => [ [ $^X, '-Mblib', '-MO=Deobfuscate', 'HERE' ] ],
+        nm => 'basic deobfuscation'
+    },
+    {   cmd => [ [ $^X, '-Mblib', '-MO=Deobfuscate,-y', 'HERE' ] ],
+        nm => 'yaml output'
+    },
+    {   cmd => [
+            [ $^X, '-Mblib', '-MO=Deobfuscate,-y', 'HERE' ],
+            '|',
+            [ $^X, '-000', '-MYAML', '-e', 'Load(scalar <STDIN>)' ]
+        ],
+        nm => 'yaml syntax'
+    },
+    {   cmd => [
+            [ $^X, '-Mblib', '-MO=Deobfuscate', 'HERE' ],
+            '|', [ $^X, $syntax_checker ]
+        ],
+        nm => 'deobfuscation syntax check'
+    },
+    )
+{
+
+    for my $script (@scripts) {
+
+        seek $tmp_fh, 0, 0;
+        truncate $tmp_fh, 0;
+
+        my @command = map {
+            ref()
+                ? [ map { /^HERE\z/ ? $script : $_ } @$_ ]
+                : $_
+        } @{ $test->{cmd} };
+
+        local ( $@, $? );
+
+        my $ok = run( @command, '2>&1', '>', $tmp_nm );
+        ok( $ok, $test->{nm} );
+        if ( not $ok ) {
+            local $/;
+            diag( \@command, scalar <$tmp_fh> );
+        }
+    }
+}
+
+my $canonizer = catfile( $test_dir, 'canon.pl' );
 for my $script (@scripts) {
-    my $normal = qq["$perlbin" "-MO=Concise" "$script" | ] .
-                 qq["$perlbin" "$canonizer"];
-    my $deob   = qq["$perlbin" "-Mblib" "-MO=Deobfuscate" "$script" | ] .
-                 qq["$perlbin" "-MO=Concise" | ] .
-                 qq["$perlbin" "$canonizer"];
+    my @normal = (
+        [ $^X, '-MO=Concise', $script ],
+        '|', [ $^X, $canonizer ],
+        '>', $tmp_nm
+    );
+    my @deob = (
+        [ $^X, '-Mblib', '-MO=Deobfuscate', $script ],
+        '|', [ $^X, '-MO=Concise' ],
+        '|', [ $^X, $canonizer ],
+        '>', $tmp_nm
+    );
 
-    $normal = `$normal`;
-    is( $?, 0, "Fetching normal optree: $script" );
+    seek $tmp_fh, 0, 0;
+    truncate $tmp_fh, 0;
+    ok( run(@normal), "Normal $script" );
+    my $normal = do {
+        local $/;
+        <$tmp_fh>;
+    };
 
-    $deob   = `$deob`;
-    is( $?, 0, "Fetching deobfuscated optree: $script" );
+    seek $tmp_fh, 0, 0;
+    truncate $tmp_fh, 0;
+    ok( run(@deob), "Deobfuscate $script" );
+    my $deob = do {
+        local $/;
+        <$tmp_fh>;
+    };
 
-    is( $normal eq $deob, "1", "Comparing optrees: $script" );
+    is( "$normal", "$deob", "Comparing optrees: $script" );
 }

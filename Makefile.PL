@@ -3,11 +3,6 @@ WriteMakefile(
     'NAME'         => 'B::Deobfuscate',
     'VERSION_FROM' => 'lib/B/Deobfuscate.pm',
     'PREREQ_PM'    => {
-
-        # B
-        # B::Deparse
-        # Carp
-        # Data::Postponed
         'B::Keywords' => '1.04',
         'YAML'        => '0'
     },

@@ -1,10 +1,14 @@
 package B::Deobfuscate;
 use strict;
 use warnings;
-
+use vars qw( @ISA $VERSION );
 use B qw( main_cv main_root main_start );
+use B::Deparse;
 
 BEGIN {
+    @ISA     = 'B::Deparse';
+    $VERSION = '0.20';
+
     for my $func (qw( begin_av init_av check_av end_av )) {
 
         ## no critic
@@ -26,19 +30,16 @@ BEGIN {
     else {
         *perlstring = sub { '"' . quotemeta( shift @_ ) . '"' };
     }
+
 }
 use B::Keywords qw( @Barewords @Symbols );
 
-use base 'B::Deparse';
-
-use autouse Carp => 'confess';
+use Carp 'confess';
 use IO::Handle ();
-use autouse YAML => qw( LoadFile Dump );
+use YAML qw( LoadFile Dump );
 
 # use Data::Postponed 'postpone_forever';
 sub postpone_forever { return shift @_ }
-
-our $VERSION = '0.18';
 
 sub load_keywords {
     my $self = shift @_;
@@ -88,8 +89,8 @@ sub load_unknown_dict {
 
     $p->{unknown_dict_data} = [
         sort { length $a <=> length $b or $a cmp $b }
-            grep { not( /\W/mx or exists $k->{$_} ) }
-            split /\n/mx,
+            grep { not( /\W/ or exists $k->{$_} ) }
+            split /\n/,
         $dict_data
     ];
 
@@ -172,10 +173,13 @@ sub gv_should_be_renamed {
     confess("Undefined sigil") unless defined $sigil;
     confess("Undefined name")  unless defined $name;
 
-    # Ignore keywords
+# Bug 24334: $1 gets passed in w/o a sigil. Dunno why. That's wrong and broke the previous version of
+# the regexp which read m{^\$\d+\z}
+
+    # Ignore keywords.
     return
         if exists $k->{$name}
-        or "$sigil$name" =~ m{\A\$\d+\z}mx;
+        or "$sigil$name" =~ m{^\$?\d+\z};
 
     if ( exists $p->{gv_symbols}{$name}
         or $name =~ $p->{gv_match} )
@@ -189,7 +193,7 @@ sub rename_pad {
     my ( $self, $name ) = @_;
     my $p = $self->{ +__PACKAGE__ };
 
-    my ($sigil) = $name =~ m{\A(\W+)}mx
+    my ($sigil) = $name =~ m{^(\W+)}
         or confess "Invalid pad variable name $name";
 
     my $dict = $p->{pad_symbols};
@@ -207,12 +211,12 @@ sub rename_pad {
 sub lookup_sigil {
     my $rv = shift @_;
 
-    return $rv =~ /(?:gv|pad|rv2)sv\z/mx ? '$'
-        : $rv =~ /(?:gvav|padav|av2arylen|rv2av|aelemfast|aelem|aslice)\z/mx
+    return $rv =~ /(?:gv|pad|rv2)sv\z/ ? '$'
+        : $rv =~ /(?:gvav|padav|av2arylen|rv2av|aelemfast|aelem|aslice)\z/
         ? '@'
-        : $rv =~ /(?:padhv|rv2hv|helem|hslice)\z/mx ? '%'
-        : $rv =~ /rv2cv\z/mx                        ? '&'
-        : $rv =~ /(?:gv|gelem|rv2gv)\z/mx           ? ''
+        : $rv =~ /(?:padhv|rv2hv|helem|hslice)\z/ ? '%'
+        : $rv =~ /rv2cv\z/                        ? '&'
+        : $rv =~ /(?:gv|gelem|rv2gv)\z/           ? ''
         :
 
         # Nothing valid;
@@ -269,7 +273,7 @@ sub new {
     $p->{unknown_dict_module} = undef;
     $p->{unknown_dict_data}   = undef;
     $p->{user_config}         = undef;
-    $p->{gv_match}            = qw/\A[[:lower:][:digit:]_]+\z/;
+    $p->{gv_match}            = qw/^[[:lower:][:digit:]_]+\z/;
     $p->{pad_symbols}         = {};
     $p->{gv_symbols}          = {};
     $p->{output_yaml}         = 0;
@@ -277,19 +281,19 @@ sub new {
 
     while ( my $arg = shift @_ ) {
         ## no critic
-        if ( $arg =~ m{\A-d([^,]+)} ) {
+        if ( $arg =~ m{^-d([^,]+)} ) {
             $p->{unknown_dict_file} = $1;
         }
-        elsif ( $arg =~ m{\A-D([^,]+)} ) {
+        elsif ( $arg =~ m{^-D([^,]+)} ) {
             $p->{unknown_dict_module} = $1;
         }
-        elsif ( $arg =~ m{\A-c([^,]+)} ) {
+        elsif ( $arg =~ m{^-c([^,]+)} ) {
             $p->{user_config} = $1;
         }
-        elsif ( $arg =~ m{\A-m/([^/]+)/} ) {
+        elsif ( $arg =~ m{^-m/([^/]+)/} ) {
             $p->{gv_match} = $1;
         }
-        elsif ( $arg =~ m{\A-y} ) {
+        elsif ( $arg =~ m{^-y} ) {
             $p->{output_yaml} = 1;
         }
     }
@@ -358,8 +362,8 @@ sub compile {    ## no critic Complex
         }
 
         $source .= join "\n", $self->print_protos;
-        @{ $self->{subs_todo} } =
-            sort { $a->[0] <=> $b->[0] } @{ $self->{subs_todo} };
+        @{ $self->{subs_todo} }
+            = sort { $a->[0] <=> $b->[0] } @{ $self->{subs_todo} };
         $source .= join "\n", $self->indent( $self->deparse( main_root, 0 ) ),
             "\n"
             unless B::Deparse::null main_root;
@@ -371,8 +375,8 @@ sub compile {    ## no critic Complex
             if @text;
 
         # Print __DATA__ section, if necessary
-        my $laststash =
-            defined $self->{curcop}
+        my $laststash
+            = defined $self->{curcop}
             ? $self->{curcop}->stash->NAME
             : $self->{curstash};
         {

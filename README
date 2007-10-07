@@ -1,4 +1,4 @@
-B::Deobfuscate version 0.17
+B::Deobfuscate version 0.19
 ==========================
 
 B::Deobfuscate is a backend module for the Perl compiler that
@@ -30,7 +30,7 @@ DEPENDENCIES
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2007 Joshua b. Jore. All rights reserved.
+Copyright (C) 2007 Joshua ben Jore. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
